@@ -1,9 +1,6 @@
 # =========================
-# 网关远程配置
-# 说明：
-# 1. 该文件由 config-server 读取并下发给 api-gateway。
-# 2. 这里放“主要业务配置”，方便统一管理和后续扩展。
-# 3. api-gateway 本地 application.yml 只保留最小启动配置。
+# api-gateway 远程配置
+# 由 config-server 读取并下发给网关。
 # =========================
 
 server:
@@ -26,6 +23,11 @@ spring:
       ddl-auto: update
     # 控制台打印 SQL，便于调试和学习。
     show-sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 3s
   cloud:
     gateway:
       discovery:
@@ -88,6 +90,17 @@ gateway:
     class-max-requests: 40
     # 公共接口（如登录）限流阈值。
     public-max-requests: 20
+  access-control:
+    enabled: true
+    protected-prefixes:
+      - /actuator
+      - /admin
+    allow-ip-prefixes:
+      - 127.0.0.1
+      - ::1
+      - 192.168.
+      - 10.
+      - 172.
 
 eureka:
   client:
