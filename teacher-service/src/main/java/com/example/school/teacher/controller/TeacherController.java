@@ -56,4 +56,14 @@ public class TeacherController {
         }
         return Map.of("success", exists, "id", id);
     }
+
+    /*
+     * ==================== 面试题（老师 CRUD） ====================
+     * Q1：Controller 为什么只依赖 Repository，不写 Service 层？
+     * A：这是演示项目的简化写法；生产项目通常会增加 Service 层承载业务逻辑。
+     *
+     * Q2：REST 风格里 GET/POST/PUT/DELETE 如何语义化？
+     * A：GET 查询，POST 新增，PUT 全量更新，DELETE 删除。
+     * ============================================================
+     */
 }

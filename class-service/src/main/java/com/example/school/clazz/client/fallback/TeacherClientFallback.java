@@ -6,10 +6,11 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * teacher-service 调用失败时的降级返回
+ * teacher-service 不可用时的 Feign 降级实现。
  */
 @Component
 public class TeacherClientFallback implements TeacherClient {
+
     @Override
     public Map<String, Object> getTeacher(Long id) {
         return Map.of(

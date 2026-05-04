@@ -8,11 +8,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import java.util.Map;
 
 /**
- * 调用 teacher-service 的 Feign 客户端
+ * 老师服务 Feign 客户端（跨模块调用关键点）。
  */
 @FeignClient(name = "teacher-service", fallback = TeacherClientFallback.class)
 public interface TeacherClient {
 
+    /**
+     * 调 teacher-service 的 /teacher/{id} 接口。
+     */
     @GetMapping("/teacher/{id}")
     Map<String, Object> getTeacher(@PathVariable("id") Long id);
 }

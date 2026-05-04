@@ -56,4 +56,17 @@ public class StudentController {
         }
         return Map.of("success", exists, "id", id);
     }
+
+    /*
+     * ==================== 面试题（学生 CRUD） ====================
+     * Q1：为什么 create 里要 student.setId(null)？
+     * A：防止前端传入 id 覆盖主键，确保由数据库自增生成新记录。
+     *
+     * Q2：update 为什么直接 save？
+     * A：JPA save 对有主键对象执行更新；无主键对象执行插入。
+     *
+     * Q3：delete 为什么先 existsById？
+     * A：先判断存在性可返回更友好的业务结果（success=true/false）。
+     * ============================================================
+     */
 }
