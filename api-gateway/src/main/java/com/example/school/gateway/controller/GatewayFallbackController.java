@@ -1,4 +1,4 @@
-package com.example.school.gateway.controller;
+﻿package com.example.school.gateway.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -8,12 +8,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-// 网关降级返回控制器：下游服务熔断时返回兜底响应。
+/**
+ * 网关降级返回控制器。
+ *
+ * 当路由上的熔断器打开或下游不可用时，
+ * 会转发到这些 fallback 端点返回统一兜底结果。
+ */
 @RestController
 @RequestMapping("/fallback")
 public class GatewayFallbackController {
 
-    // class-service 的降级返回。
+    /**
+     * class-service 的兜底响应。
+     */
     @GetMapping(value = "/class", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> classFallback() {
         return Map.of(
@@ -23,7 +30,9 @@ public class GatewayFallbackController {
         );
     }
 
-    // student-service 的降级返回。
+    /**
+     * student-service 的兜底响应。
+     */
     @GetMapping(value = "/student", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> studentFallback() {
         return Map.of(
@@ -33,7 +42,9 @@ public class GatewayFallbackController {
         );
     }
 
-    // teacher-service 的降级返回。
+    /**
+     * teacher-service 的兜底响应。
+     */
     @GetMapping(value = "/teacher", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> teacherFallback() {
         return Map.of(
