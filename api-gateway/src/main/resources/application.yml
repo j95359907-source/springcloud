@@ -1,33 +1,16 @@
-server:
-  port: 9000
+# =========================
+# 网关本地最小启动配置
+# 说明：
+# 1. 这里只保留“服务名”和“配置中心地址”。
+# 2. 这样项目启动后会去 config-server 拉取 config-repo/api-gateway.yml。
+# 3. 主要业务配置统一放到配置中心，便于集中管理。
+# =========================
 
 spring:
   application:
+    # 当前微服务名称，配置中心和注册中心都依赖这个名字识别服务。
     name: api-gateway
   config:
+    # 启动时从配置中心拉取远程配置。
+    # optional 表示：就算配置中心暂时不可用，也允许本地先启动。
     import: optional:configserver:http://localhost:8888
-
-  cloud:
-    gateway:
-      discovery:
-        locator:
-          enabled: false
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: "*"
-
-resilience4j:
-  circuitbreaker:
-    instances:
-      classCircuit:
-        slidingWindowSize: 10
-        failureRateThreshold: 50
-        waitDurationInOpenState: 10s

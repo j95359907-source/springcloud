@@ -1,26 +1,47 @@
+# =========================
+# 配置中心本地配置
+# 说明：
+# 1. config-server 是整个项目的远程配置下发中心。
+# 2. 当前采用 native 模式，也就是直接从本地目录读取配置文件。
+# 3. 如果后续想升级，可以切换到 Git 模式，把配置仓库放到代码托管平台。
+# =========================
+
 server:
+  # 配置中心端口。
   port: 8888
 
 spring:
   application:
+    # 当前服务名称。
     name: config-server
+  security:
+    user:
+      # 配置中心基础登录账号。
+      name: admin
+      # 配置中心基础登录密码。
+      password: admin123
   cloud:
     config:
       server:
         native:
-          # 本地文件方式作为配置仓库：
-          # 这里使用上一级目录，兼容“在根目录启动”和“在模块目录启动”两种方式
+          # native 模式下的配置仓库目录。
+          # 这里同时兼容两种启动位置：
+          # 1. 从根目录启动时使用 ../config-repo
+          # 2. 从当前模块启动时使用 ./config-repo
           search-locations: file:../config-repo,file:./config-repo
   profiles:
+    # 激活 native 模式，表示配置中心读取本地文件系统，而不是 Git 仓库。
     active: native
 
 eureka:
   client:
     service-url:
+      # 把配置中心自己也注册到 Eureka，方便其他服务发现它。
       defaultZone: http://localhost:8761/eureka/
 
 management:
   endpoints:
     web:
       exposure:
+        # 暴露全部 Actuator 端点，便于本地调试和刷新配置。
         include: "*"

@@ -1,5 +1,5 @@
 server:
-  port: 9013
+  port: 9019
 
 demo:
   module: class-service

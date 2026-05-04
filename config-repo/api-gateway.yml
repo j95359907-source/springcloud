@@ -1,2 +1,148 @@
+# =========================
+# 网关远程配置
+# 说明：
+# 1. 该文件由 config-server 读取并下发给 api-gateway。
+# 2. 这里放“主要业务配置”，方便统一管理和后续扩展。
+# 3. api-gateway 本地 application.yml 只保留最小启动配置。
+# =========================
+
 server:
+  # 网关服务端口，前端统一从这里进入系统。
   port: 9000
+
+spring:
+  datasource:
+    # 网关自己的数据库连接，主要给登录、用户、权限等本地数据使用。
+    url: jdbc:mysql://localhost:3306/school_demo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+    # 数据库用户名。
+    username: root
+    # 数据库密码。
+    password: root
+    # MySQL 8 驱动类。
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      # 启动时自动更新表结构，适合教学和本地开发环境。
+      ddl-auto: update
+    # 控制台打印 SQL，便于调试和学习。
+    show-sql: true
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          # 是否根据注册中心的服务自动生成路由。
+          # 这里关闭，表示我们使用 Java 代码手动配置路由，更适合教学阅读。
+          enabled: false
+      httpclient:
+        # 网关连接下游服务的超时时间，单位毫秒。
+        connect-timeout: 3000
+        # 网关等待下游服务响应的最大时长。
+        response-timeout: 8s
+      default-filters:
+        # 去重跨域响应头，避免浏览器因重复头报错。
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+        # 给所有响应补一个网关标识头，方便抓包和排查。
+        - AddResponseHeader=X-Gateway, school-api-gateway
+        # 去掉默认的 Server 头，减少服务指纹暴露。
+        - RemoveResponseHeader=Server
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            # 允许所有来源跨域访问；生产环境建议改成白名单域名。
+            allowedOrigins: "*"
+            # 允许跨域请求的方法。
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            # 允许浏览器携带的请求头。
+            allowedHeaders: "*"
+            # 允许前端读取的响应头。
+            exposedHeaders:
+              # 追踪链路用的响应头。
+              - X-Trace-Id
+              # 限流总配额。
+              - X-RateLimit-Limit
+              # 限流剩余额度。
+              - X-RateLimit-Remaining
+              # 命中的网关路由标识。
+              - X-Gateway-Route
+    loadbalancer:
+      retry:
+        # 开启基于服务名调用时的重试能力。
+        enabled: true
+
+gateway:
+  rate-limit:
+    # 限流统计窗口时长，单位秒。
+    window-seconds: 10
+    # 默认接口在一个窗口内的最大请求数。
+    max-requests: 40
+    # 学生接口单独限流阈值。
+    student-max-requests: 60
+    # 老师接口单独限流阈值。
+    teacher-max-requests: 50
+    # 班级接口单独限流阈值。
+    class-max-requests: 40
+    # 公共接口（如登录）限流阈值。
+    public-max-requests: 20
+
+eureka:
+  client:
+    service-url:
+      # 注册中心地址，网关启动后会注册到这里并发现其他服务。
+      defaultZone: http://localhost:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # 暴露全部 Actuator 端点，便于教学和本地排查。
+        include: "*"
+  endpoint:
+    health:
+      # 健康检查返回详细信息。
+      show-details: always
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      classCircuit:
+        # 熔断统计窗口类型：按调用次数统计。
+        slidingWindowType: COUNT_BASED
+        # 最近 20 次调用作为统计样本。
+        slidingWindowSize: 20
+        # 至少达到 10 次调用后才开始计算失败率。
+        minimumNumberOfCalls: 10
+        # 失败率达到 50% 时打开熔断器。
+        failureRateThreshold: 50
+        # 单次调用超过 2 秒视为慢调用。
+        slowCallDurationThreshold: 2s
+        # 慢调用比例达到 50% 也可触发熔断。
+        slowCallRateThreshold: 50
+        # 熔断打开后等待 10 秒再进入半开状态。
+        waitDurationInOpenState: 10s
+        # 半开状态允许 3 次试探请求。
+        permittedNumberOfCallsInHalfOpenState: 3
+        # 允许熔断器自动从打开状态过渡到半开状态。
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+  timelimiter:
+    instances:
+      classCircuit:
+        # 下游调用超过 3 秒则判定超时。
+        timeoutDuration: 3s
+
+jwt:
+  # JWT 签名密钥，演示项目直接写配置；生产环境建议放到密钥管理系统。
+  secret: school-demo-jwt-secret-key-change-me-2026
+  # token 过期时间，单位分钟。
+  expire-minutes: 120
+
+logging:
+  level:
+    # 网关核心日志级别。
+    org.springframework.cloud.gateway: INFO
+    # Reactor Netty 客户端日志级别，调成 WARN 减少噪音。
+    reactor.netty.http.client: WARN

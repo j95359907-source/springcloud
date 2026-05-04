@@ -23,11 +23,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 班级聚合接口：聚合学生和老师信息
+ * 班级聚合控制器（面试高频）：
+ * 技术点组合：
+ * 1) JPA CRUD（SchoolClassRepository）
+ * 2) Feign 远程调用（StudentClient / TeacherClient）
+ * 3) Redis 缓存（StringRedisTemplate）
+ * 4) RabbitMQ 事件发布（ClassEventPublisher）
+ * 5) 熔断降级（Resilience4j @CircuitBreaker）
  */
 @RestController
 @RequestMapping("/class")
 public class ClassController {
+
     private static final String CLASS_DETAIL_CACHE_KEY_PREFIX = "class:detail:";
 
     private final StudentClient studentClient;
@@ -65,7 +72,7 @@ public class ClassController {
     public SchoolClass create(@RequestBody SchoolClass schoolClass) {
         schoolClass.setId(null);
         SchoolClass created = repository.save(schoolClass);
-        // 发送 RabbitMQ 事件：班级新增
+        // 发送 CREATE 事件，供审计/通知/异步任务消费。
         classEventPublisher.publish("CREATE", created.getId());
         return created;
     }
@@ -74,9 +81,9 @@ public class ClassController {
     public SchoolClass update(@PathVariable("classId") Long classId, @RequestBody SchoolClass schoolClass) {
         schoolClass.setId(classId);
         SchoolClass updated = repository.save(schoolClass);
-        // 更新后删除缓存，确保下次查询拿到最新数据
+        // 修改后删除缓存，避免脏数据。
         evictClassDetailCache(classId);
-        // 发送 RabbitMQ 事件：班级更新
+        // 发送 UPDATE 事件。
         classEventPublisher.publish("UPDATE", classId);
         return updated;
     }
@@ -87,55 +94,63 @@ public class ClassController {
         if (exists) {
             repository.deleteById(classId);
             evictClassDetailCache(classId);
-            // 发送 RabbitMQ 事件：班级删除
+            // 发送 DELETE 事件。
             classEventPublisher.publish("DELETE", classId);
         }
         return Map.of("success", exists, "id", classId);
     }
 
+    /**
+     * 班级聚合详情：
+     * - 先查 Redis 缓存
+     * - 缓存未命中再查 DB + Feign
+     * - 写回缓存
+     * - 配置熔断降级
+     */
     @GetMapping("/{classId}/detail")
     @CircuitBreaker(name = "classAggregate", fallbackMethod = "fallbackClassInfo")
     public Map<String, Object> getClassInfo(@PathVariable("classId") Long classId) {
         String cacheKey = CLASS_DETAIL_CACHE_KEY_PREFIX + classId;
-        // 1) 先查 Redis 缓存，命中则直接返回，减少数据库和远程调用压力
+
+        // 1) 优先命中缓存，降低 DB 和远程调用压力。
         String cachedJson = stringRedisTemplate.opsForValue().get(cacheKey);
         if (cachedJson != null && !cachedJson.isBlank()) {
             try {
                 return objectMapper.readValue(cachedJson, new TypeReference<Map<String, Object>>() { });
             } catch (Exception ignored) {
-                // 缓存解析异常时降级为重新计算，不影响主流程
+                // 缓存解析失败时回退到实时计算，不影响主流程。
             }
         }
 
+        // 2) 查班级基础信息。
         SchoolClass clazz = repository.findById(classId).orElse(null);
         if (clazz == null) {
             return Map.of("success", false, "message", "班级不存在", "classId", classId);
         }
 
+        // 3) 聚合远程数据：学生+老师。
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("classId", classId);
         result.put("className", clazz.getName());
-
-        // 关键点：Feign 根据服务名调用 + LoadBalancer 自动选择可用实例
         result.put("student", studentClient.getStudent(clazz.getStudentId()));
         result.put("teacher", teacherClient.getTeacher(clazz.getTeacherId()));
 
-        // 2) 写入 Redis，后续查询直接命中
+        // 4) 回写缓存。
         try {
             stringRedisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(result));
         } catch (Exception ignored) {
-            // 缓存写失败不影响主流程
+            // 缓存写失败不影响结果返回。
         }
         return result;
     }
 
     /**
-     * 熔断降级方法：当 getClassInfo 失败时返回兜底数据
+     * 熔断降级方法：当聚合流程失败时，返回兜底结构。
      */
     public Map<String, Object> fallbackClassInfo(Long classId, Throwable throwable) {
         return Map.of(
                 "classId", classId,
-                "className", "三年二班",
+                "className", "默认班级",
                 "remark", "class-service 熔断降级",
                 "reason", throwable.getClass().getSimpleName()
         );
@@ -144,4 +159,20 @@ public class ClassController {
     private void evictClassDetailCache(Long classId) {
         stringRedisTemplate.delete(CLASS_DETAIL_CACHE_KEY_PREFIX + classId);
     }
+
+    /*
+     * =================== 面试题（聚合 + 缓存 + 熔断 + MQ） ===================
+     * Q1：为什么 class 详情接口要先查 Redis，再查 DB/Feign？
+     * A：热点数据先走缓存可显著降低数据库与远程调用压力，提高响应速度。
+     *
+     * Q2：为什么更新/删除后要删缓存，而不是直接更新缓存？
+     * A：删除缓存（Cache Aside）实现简单且一致性更稳，避免复杂并发更新问题。
+     *
+     * Q3：@CircuitBreaker + fallbackMethod 的价值是什么？
+     * A：下游异常时快速降级，保证主接口仍可返回可解释结果，避免雪崩。
+     *
+     * Q4：为什么增删改后发送 RabbitMQ 事件？
+     * A：用异步事件解耦后续流程（审计、通知、统计），避免主链路阻塞。
+     * ======================================================================
+     */
 }

@@ -1,16 +1,45 @@
 package com.example.school.gateway.controller;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 网关降级返回
- */
+import java.util.Map;
+
+// 网关降级返回控制器：下游服务熔断时返回兜底响应。
 @RestController
+@RequestMapping("/fallback")
 public class GatewayFallbackController {
 
-    @GetMapping("/fallback/class")
-    public String classFallback() {
-        return "class-service 当前不可用，已触发网关熔断降级";
+    // class-service 的降级返回。
+    @GetMapping(value = "/class", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> classFallback() {
+        return Map.of(
+                "success", false,
+                "code", HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "message", "class-service is unavailable, fallback response from gateway"
+        );
+    }
+
+    // student-service 的降级返回。
+    @GetMapping(value = "/student", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> studentFallback() {
+        return Map.of(
+                "success", false,
+                "code", HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "message", "student-service is unavailable, fallback response from gateway"
+        );
+    }
+
+    // teacher-service 的降级返回。
+    @GetMapping(value = "/teacher", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> teacherFallback() {
+        return Map.of(
+                "success", false,
+                "code", HttpStatus.SERVICE_UNAVAILABLE.value(),
+                "message", "teacher-service is unavailable, fallback response from gateway"
+        );
     }
 }

@@ -1,17 +1,30 @@
+# =========================
+# 注册中心本地配置
+# 说明：
+# 1. registry-server 本身就是服务治理基础设施，不承载业务接口。
+# 2. 该模块主要靠框架自动提供能力，所以配置和代码都比较精简。
+# 3. 这里的重点是理解“为什么要这样配”。
+# =========================
+
 server:
+  # 注册中心端口。
   port: 8761
 
 spring:
   application:
+    # 当前服务名。
     name: registry-server
 
 eureka:
   client:
+    # 当前应用自己就是注册中心，不需要再把自己注册到其他 Eureka 上。
     register-with-eureka: false
+    # 当前应用自己就是注册中心，不需要去别的 Eureka 拉取注册表。
     fetch-registry: false
 
 management:
   endpoints:
     web:
       exposure:
+        # 暴露全部 Actuator 端点，方便本地排查和教学演示。
         include: "*"
