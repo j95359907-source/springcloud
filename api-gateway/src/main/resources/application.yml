@@ -1,16 +1,63 @@
 # =========================
-# 网关本地最小启动配置
-# 说明：
-# 1. 这里只保留“服务名”和“配置中心地址”。
-# 2. 这样项目启动后会去 config-server 拉取 config-repo/api-gateway.yml。
-# 3. 主要业务配置统一放到配置中心，便于集中管理。
+# api-gateway 本地最小启动 + 兜底配置
+# 配置中心正常时，主要配置来自 config-repo/api-gateway.yml。
+# 配置中心没启动时，这里至少提供数据库、Redis、注册中心等基础配置。
 # =========================
+
+server:
+  port: 9000
 
 spring:
   application:
-    # 当前微服务名称，配置中心和注册中心都依赖这个名字识别服务。
     name: api-gateway
   config:
-    # 启动时从配置中心拉取远程配置。
-    # optional 表示：就算配置中心暂时不可用，也允许本地先启动。
     import: optional:configserver:http://localhost:8888
+  datasource:
+    url: jdbc:mysql://localhost:3306/school_demo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 3s
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+jwt:
+  secret: school-demo-jwt-secret-key-change-me-2026
+  expire-minutes: 120
+
+gateway:
+  rate-limit:
+    window-seconds: 10
+    max-requests: 40
+    student-max-requests: 60
+    teacher-max-requests: 50
+    class-max-requests: 40
+    public-max-requests: 20
+  access-control:
+    enabled: true
+    protected-prefixes:
+      - /actuator
+      - /admin
+    allow-ip-prefixes:
+      - 127.0.0.1
+      - ::1
+      - 192.168.
+      - 10.
+      - 172.

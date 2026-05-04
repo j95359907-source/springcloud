@@ -16,6 +16,8 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 // Spring 配置类注解。
 import org.springframework.context.annotation.Configuration;
+// 按 Bean 名称精确注入，避免多个同类型 Bean 时 Spring 不知道选哪一个。
+import org.springframework.beans.factory.annotation.Qualifier;
 
 // Map 用来声明队列参数。
 import java.util.Map;
@@ -73,14 +75,15 @@ public class ClassEventMqConfig {
 
     // 把正常队列绑定到正常交换机。
     @Bean
-    public Binding classEventBinding(Queue classEventQueue, DirectExchange classEventExchange) {
+    public Binding classEventBinding(@Qualifier("classEventQueue") Queue classEventQueue,
+                                     @Qualifier("classEventExchange") DirectExchange classEventExchange) {
         return BindingBuilder.bind(classEventQueue).to(classEventExchange).with(ROUTING_KEY);
     }
 
     // 把死信队列绑定到死信交换机。
     @Bean
-    public Binding classEventDeadLetterBinding(Queue classEventDeadLetterQueue,
-                                               DirectExchange classEventDeadLetterExchange) {
+    public Binding classEventDeadLetterBinding(@Qualifier("classEventDeadLetterQueue") Queue classEventDeadLetterQueue,
+                                               @Qualifier("classEventDeadLetterExchange") DirectExchange classEventDeadLetterExchange) {
         return BindingBuilder.bind(classEventDeadLetterQueue)
                 .to(classEventDeadLetterExchange)
                 .with(DLX_ROUTING_KEY);

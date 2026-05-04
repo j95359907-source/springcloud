@@ -155,7 +155,7 @@ public class LocalRateLimitFilter implements GlobalFilter, Ordered {
                                        int groupLimit) {
         exchange.getResponse().setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
         addRateLimitHeaders(exchange, bucketKey, group, groupLimit, 0);
-        exchange.getResponse().getHeaders().set("Retry-After", String.valueOf(props.getWindowSeconds()));
+        safeSetHeader(exchange, "Retry-After", String.valueOf(props.getWindowSeconds()));
     }
 
     private void addRateLimitHeaders(ServerWebExchange exchange,
@@ -163,11 +163,22 @@ public class LocalRateLimitFilter implements GlobalFilter, Ordered {
                                      String group,
                                      int groupLimit,
                                      long remaining) {
-        exchange.getResponse().getHeaders().set("X-RateLimit-Key", bucketKey);
-        exchange.getResponse().getHeaders().set("X-RateLimit-Group", group);
-        exchange.getResponse().getHeaders().set("X-RateLimit-Limit", String.valueOf(groupLimit));
-        exchange.getResponse().getHeaders().set("X-RateLimit-Remaining", String.valueOf(remaining));
-        exchange.getResponse().getHeaders().set("X-RateLimit-Window", String.valueOf(props.getWindowSeconds()));
+        safeSetHeader(exchange, "X-RateLimit-Key", bucketKey);
+        safeSetHeader(exchange, "X-RateLimit-Group", group);
+        safeSetHeader(exchange, "X-RateLimit-Limit", String.valueOf(groupLimit));
+        safeSetHeader(exchange, "X-RateLimit-Remaining", String.valueOf(remaining));
+        safeSetHeader(exchange, "X-RateLimit-Window", String.valueOf(props.getWindowSeconds()));
+    }
+
+    // 安全写响应头：响应头只读时不再抛异常，避免限流提示头影响业务请求。
+    private void safeSetHeader(ServerWebExchange exchange, String name, String value) {
+        try {
+            if (!exchange.getResponse().isCommitted()) {
+                exchange.getResponse().getHeaders().set(name, value);
+            }
+        } catch (UnsupportedOperationException ignored) {
+            // Gateway 某些阶段会把 headers 包装成只读对象，提示头写失败不应该影响主流程。
+        }
     }
 
     private String resolveSubject(ServerWebExchange exchange) {

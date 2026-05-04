@@ -1,6 +1,22 @@
+# =========================
+# student-service 本地兜底配置
+# 配置中心正常时，优先使用 config-repo/student-service.yml。
+# 配置中心没启动时，这里保证服务仍能拿到端口、数据库和注册中心配置。
+# =========================
+
 server:
-  # 兜底端口：即使配置中心暂不可用，也不会与其它服务抢 8080
   port: 9011
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/school_demo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
 
 management:
   endpoints:

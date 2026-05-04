@@ -2,6 +2,7 @@ package com.example.school.student.controller;
 
 import com.example.school.student.model.Student;
 import com.example.school.student.repository.StudentRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,10 +38,13 @@ public class StudentController {
     }
 
     @PostMapping
-    public Student create(@RequestBody Student student) {
+    public Student create(@RequestBody Student student, HttpServletRequest request) {
+        System.out.println("X-Auth-User=" + request.getHeader("X-Auth-User"));
+        System.out.println("X-Auth-Role=" + request.getHeader("X-Auth-Role"));
         student.setId(null);
         return repository.save(student);
     }
+
 
     @PutMapping("/{id}")
     public Student update(@PathVariable("id") Long id, @RequestBody Student student) {

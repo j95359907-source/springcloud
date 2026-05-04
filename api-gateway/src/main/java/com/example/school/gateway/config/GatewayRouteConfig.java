@@ -6,101 +6,85 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 
-// 声明这是配置类，Spring 启动时会加载其中的 @Bean。
+/**
+ * 网关路由配置。
+ *
+ * Spring Cloud Gateway 的核心职责之一就是“路由”：
+ * 1. 根据请求路径和请求方法判断应该进入哪个服务；
+ * 2. 通过 lb://服务名 交给 Spring Cloud LoadBalancer 做负载均衡；
+ * 3. 对不同路由添加重试、熔断、降级等策略。
+ */
 @Configuration
 public class GatewayRouteConfig {
-    // ================== 网关过滤器执行顺序图（文字版） ==================
-    // 入口请求
-    //   -> GlobalFilter(LocalRateLimitFilter, order=-120)：先限流，超额直接 429，减少无效下游开销
-    //   -> GlobalFilter(JwtAuthGlobalFilter, order=-100)：再鉴权，未登录/无权限直接 401/403
-    //   -> GlobalFilter(GatewayTraceFilter, order=-90)：记录链路与耗时（请求结束时打印日志）
-    //   -> Route Predicate：匹配 path + method 命中具体路由
-    //   -> Route Filters：执行当前路由的 Retry / CircuitBreaker / AddResponseHeader 等
-    //   -> lb://service-id：交给 Spring Cloud LoadBalancer 选择实例并转发
-    //   -> 下游服务处理并返回
-    //   -> 响应回传网关（触发响应头追加、去重等默认过滤器）
-    //   -> 返回前端
-    //
-    // 面试回答技巧：
-    // 1) 为什么限流在鉴权之前？
-    //    因为限流是“流量闸门”，优先挡住洪峰，保护网关与鉴权模块 CPU。
-    // 2) 为什么追踪放在鉴权后？
-    //    这样日志里能保留“被拒绝请求”和“已放行请求”的统一耗时视角。
-    // 3) 为什么路由过滤器在 GlobalFilter 后？
-    //    GlobalFilter 作用于全局；Route Filter 只对命中的具体路由生效。
-    // ==============================================================
 
-    // 注册路由表 Bean，网关会按这里定义的规则转发请求。
+    /**
+     * 注册路由表 Bean，网关会按照这里定义的规则转发请求。
+     */
     @Bean
     public RouteLocator customRoutes(RouteLocatorBuilder builder) {
-        // 开始构建路由集合。
         return builder.routes()
-                // 学生查询路由：仅匹配 GET /student/**。
+                // 学生查询路由：GET /student/** -> student-service。
                 .route("student_query_route", r -> r
                         .path("/student/**")
                         .and().method(HttpMethod.GET)
                         .filters(f -> f
-                                // GET 可安全重试，提高可用性。
-                                .retry(c -> c.setRetries(2).setMethods(HttpMethod.GET))
-                                // 回写路由标识头，便于排查请求命中哪条路由。
-                                .addResponseHeader("X-Gateway-Route", "student-query"))
-                        // 使用服务名走负载均衡，不写死 IP。
+                                // GET 通常是幂等的，可以安全重试，提升临时故障下的可用性。
+                                .retry(c -> c.setRetries(2).setMethods(HttpMethod.GET)))
+                        // lb:// 表示根据服务名从注册中心拿实例，再做负载均衡。
                         .uri("lb://student-service"))
 
-                // 学生写路由：匹配 POST/PUT/DELETE /student/**。
+                // 学生写路由：POST/PUT/DELETE /student/** -> student-service。
                 .route("student_write_route", r -> r
                         .path("/student/**")
                         .and().method(HttpMethod.POST, HttpMethod.PUT, HttpMethod.DELETE)
-                        .filters(f -> f
-                                // 写请求不重试，避免重复写入风险。
-                                .addResponseHeader("X-Gateway-Route", "student-write"))
+                        // 写请求默认不重试，避免新增、修改、删除被重复执行。
                         .uri("lb://student-service"))
 
-                // 老师查询路由。
+                // 老师查询路由：GET /teacher/** -> teacher-service。
                 .route("teacher_query_route", r -> r
                         .path("/teacher/**")
                         .and().method(HttpMethod.GET)
-                        .filters(f -> f
-                                .retry(c -> c.setRetries(2).setMethods(HttpMethod.GET))
-                                .addResponseHeader("X-Gateway-Route", "teacher-query"))
+                        .filters(f -> f.retry(c -> c.setRetries(2).setMethods(HttpMethod.GET)))
                         .uri("lb://teacher-service"))
 
-                // 老师写路由。
+                // 老师写路由：POST/PUT/DELETE /teacher/** -> teacher-service。
                 .route("teacher_write_route", r -> r
                         .path("/teacher/**")
                         .and().method(HttpMethod.POST, HttpMethod.PUT, HttpMethod.DELETE)
-                        .filters(f -> f
-                                .addResponseHeader("X-Gateway-Route", "teacher-write"))
                         .uri("lb://teacher-service"))
 
-                // 班级查询路由：带重试 + 熔断降级。
+                // 班级查询路由：GET /class/** -> class-service，带重试 + 熔断降级。
                 .route("class_query_route", r -> r
                         .path("/class/**")
                         .and().method(HttpMethod.GET)
                         .filters(f -> f
                                 .retry(c -> c.setRetries(2).setMethods(HttpMethod.GET))
-                                // 下游故障时转发到网关本地 fallback 接口。
-                                .circuitBreaker(c -> c.setName("classCircuit").setFallbackUri("forward:/fallback/class"))
-                                .addResponseHeader("X-Gateway-Route", "class-query"))
+                                // 下游故障时转发到网关本地 fallback 接口，避免页面直接看到连接失败。
+                                .circuitBreaker(c -> c.setName("classCircuit").setFallbackUri("forward:/fallback/class")))
                         .uri("lb://class-service"))
 
-                // 班级写路由：保留熔断，避免下游雪崩。
+                // 班级写路由：POST/PUT/DELETE /class/** -> class-service，保留熔断保护。
                 .route("class_write_route", r -> r
                         .path("/class/**")
                         .and().method(HttpMethod.POST, HttpMethod.PUT, HttpMethod.DELETE)
-                        .filters(f -> f
-                                .circuitBreaker(c -> c.setName("classCircuit").setFallbackUri("forward:/fallback/class"))
-                                .addResponseHeader("X-Gateway-Route", "class-write"))
+                        .filters(f -> f.circuitBreaker(c -> c.setName("classCircuit").setFallbackUri("forward:/fallback/class")))
                         .uri("lb://class-service"))
-                // 完成路由构建。
                 .build();
     }
 
-    // ================== 高阶延伸面试题（不依赖本项目实现） ==================
-    // 1) Gateway 在多实例部署时，如何做全局一致限流？内存限流与 Redis 限流的误差模型如何评估？
-    // 2) 为什么写请求默认不应重试？若业务要求 POST 可重试，你如何定义幂等键与幂等窗口？
-    // 3) 熔断、重试、超时三个策略顺序如何设计？错误顺序会造成什么放大效应？
-    // 4) 如果网关同时承担鉴权、限流、灰度、降级，如何设计过滤器顺序避免互相干扰？
-    // 5) 如何实现按租户/用户/接口/版本四维路由与配额，并支持热更新与快速回滚？
-    // =====================================================================
+    /*
+     * ==================== 面试题（Gateway 路由 + 负载均衡）====================
+     * Q1：为什么 URI 使用 lb://student-service，而不是 http://localhost:9011？
+     * A：lb:// 会按服务名从注册中心发现实例，并交给 Spring Cloud LoadBalancer 选择具体实例；写死 IP 不适合多实例部署。
+     *
+     * Q2：为什么 GET 可以重试，而 POST/PUT/DELETE 默认不重试？
+     * A：GET 通常幂等，重试风险较低；写请求可能重复新增或重复扣减，必须结合幂等键才能安全重试。
+     *
+     * Q3：熔断和降级的区别是什么？
+     * A：熔断是发现下游持续失败后暂时不再调用；降级是调用失败或熔断打开后返回兜底结果。
+     *
+     * Q4：Gateway 过滤器顺序怎么设计？
+     * A：一般先做来源保护和限流，再做鉴权，再做链路追踪和安全响应头，最后路由到下游服务。
+     * ================================================================
+     */
 }
