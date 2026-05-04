@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置中心管理台</title>
+    <style>
+        body { font-family: "Microsoft YaHei", sans-serif; margin: 20px; background: #f6f8fa; }
+        .wrap { display: flex; gap: 16px; }
+        .left, .right { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        .left { width: 260px; }
+        .right { flex: 1; }
+        button { margin-top: 8px; padding: 8px 12px; border: none; color: #fff; background: #1f6feb; border-radius: 4px; cursor: pointer; }
+        textarea { width: 100%; height: 460px; font-family: Consolas, monospace; margin-top: 8px; }
+        ul { padding-left: 18px; }
+        li { cursor: pointer; margin: 6px 0; }
+    </style>
+</head>
+<body>
+<h1>配置中心管理台</h1>
+<p>用于编辑 config-repo 下的 yml 文件。保存后可调用对应服务的 <code>/actuator/refresh</code> 使配置生效。</p>
+<div class="wrap">
+    <div class="left">
+        <h3>配置文件</h3>
+        <button onclick="loadFiles()">刷新列表</button>
+        <ul id="files"></ul>
+    </div>
+    <div class="right">
+        <h3 id="title">请选择配置文件</h3>
+        <textarea id="content" placeholder="配置内容"></textarea>
+        <button onclick="saveFile()">保存文件</button>
+    </div>
+</div>
+<script>
+    let currentFile = null;
+    async function loadFiles() {
+        const res = await fetch('/admin/config/files');
+        const data = await res.json();
+        const ul = document.getElementById('files');
+        ul.innerHTML = '';
+        data.forEach(f => {
+            const li = document.createElement('li');
+            li.textContent = f;
+            li.onclick = () => openFile(f);
+            ul.appendChild(li);
+        });
+    }
+    async function openFile(file) {
+        currentFile = file;
+        document.getElementById('title').textContent = '正在编辑：' + file;
+        const res = await fetch('/admin/config/files/' + file);
+        const data = await res.json();
+        document.getElementById('content').value = data.content || '';
+    }
+    async function saveFile() {
+        if (!currentFile) return alert('请先选择文件');
+        const content = document.getElementById('content').value;
+        const res = await fetch('/admin/config/files/' + currentFile, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+        });
+        if (res.ok) alert('保存成功');
+    }
+    loadFiles();
+</script>
+</body>
+</html>

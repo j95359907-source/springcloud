@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学校微服务管理台</title>
+    <style>
+        body { font-family: "Microsoft YaHei", sans-serif; margin: 20px; background: #f5f7fb; }
+        h1 { margin-bottom: 8px; }
+        .row { display: flex; gap: 16px; flex-wrap: wrap; }
+        .card { background: #fff; border-radius: 8px; padding: 16px; width: 360px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+        input, button, textarea { width: 100%; margin-top: 8px; padding: 8px; box-sizing: border-box; }
+        button { background: #1f6feb; color: #fff; border: none; cursor: pointer; border-radius: 4px; }
+        .secondary { background: #57606a; }
+        pre { background: #0d1117; color: #c9d1d9; padding: 12px; border-radius: 6px; min-height: 120px; overflow: auto; }
+    </style>
+</head>
+<body>
+<h1>学校微服务管理台</h1>
+<p>通过网关统一调用 student / teacher / class 服务（含增删改查和班级聚合查询）。</p>
+
+<div class="row">
+    <div class="card">
+        <h3>学生 CRUD</h3>
+        <input id="sId" placeholder="ID（更新/删除/查询时填）">
+        <input id="sName" placeholder="姓名">
+        <input id="sAge" placeholder="年龄">
+        <button onclick="createStudent()">新增学生</button>
+        <button onclick="updateStudent()">修改学生</button>
+        <button class="secondary" onclick="deleteStudent()">删除学生</button>
+        <button class="secondary" onclick="listStudents()">查询全部学生</button>
+    </div>
+
+    <div class="card">
+        <h3>老师 CRUD</h3>
+        <input id="tId" placeholder="ID（更新/删除/查询时填）">
+        <input id="tName" placeholder="姓名">
+        <input id="tTitle" placeholder="职称">
+        <button onclick="createTeacher()">新增老师</button>
+        <button onclick="updateTeacher()">修改老师</button>
+        <button class="secondary" onclick="deleteTeacher()">删除老师</button>
+        <button class="secondary" onclick="listTeachers()">查询全部老师</button>
+    </div>
+
+    <div class="card">
+        <h3>班级 CRUD + 聚合</h3>
+        <input id="cId" placeholder="班级ID（更新/删除/查询时填）">
+        <input id="cName" placeholder="班级名">
+        <input id="cStudentId" placeholder="学生ID">
+        <input id="cTeacherId" placeholder="老师ID">
+        <button onclick="createClass()">新增班级</button>
+        <button onclick="updateClass()">修改班级</button>
+        <button class="secondary" onclick="deleteClass()">删除班级</button>
+        <button class="secondary" onclick="listClasses()">查询全部班级</button>
+        <button class="secondary" onclick="classDetail()">查询班级聚合详情</button>
+    </div>
+</div>
+
+<h3>返回结果</h3>
+<pre id="out"></pre>
+
+<script>
+    async function req(url, method = "GET", body = null) {
+        const res = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: body ? JSON.stringify(body) : null
+        });
+        const text = await res.text();
+        try { return JSON.parse(text); } catch (e) { return text; }
+    }
+    function show(v) { document.getElementById("out").textContent = JSON.stringify(v, null, 2); }
+
+    async function createStudent() { show(await req("/student", "POST", { name: v("sName"), age: Number(v("sAge")) })); }
+    async function updateStudent() { show(await req("/student/" + v("sId"), "PUT", { name: v("sName"), age: Number(v("sAge")) })); }
+    async function deleteStudent() { show(await req("/student/" + v("sId"), "DELETE")); }
+    async function listStudents() { show(await req("/student")); }
+
+    async function createTeacher() { show(await req("/teacher", "POST", { name: v("tName"), title: v("tTitle") })); }
+    async function updateTeacher() { show(await req("/teacher/" + v("tId"), "PUT", { name: v("tName"), title: v("tTitle") })); }
+    async function deleteTeacher() { show(await req("/teacher/" + v("tId"), "DELETE")); }
+    async function listTeachers() { show(await req("/teacher")); }
+
+    async function createClass() { show(await req("/class", "POST", { name: v("cName"), studentId: Number(v("cStudentId")), teacherId: Number(v("cTeacherId")) })); }
+    async function updateClass() { show(await req("/class/" + v("cId"), "PUT", { name: v("cName"), studentId: Number(v("cStudentId")), teacherId: Number(v("cTeacherId")) })); }
+    async function deleteClass() { show(await req("/class/" + v("cId"), "DELETE")); }
+    async function listClasses() { show(await req("/class")); }
+    async function classDetail() { show(await req("/class/" + v("cId") + "/detail")); }
+
+    function v(id) { return document.getElementById(id).value; }
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+server:
+  # 兜底端口：即使配置中心暂不可用，也不会与其它服务抢 8080
+  port: 9013
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      classAggregate:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s

@@ -1,0 +1,26 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        native:
+          # 本地文件方式作为配置仓库：
+          # 这里使用上一级目录，兼容“在根目录启动”和“在模块目录启动”两种方式
+          search-locations: file:../config-repo,file:./config-repo
+  profiles:
+    active: native
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

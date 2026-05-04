@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: class-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
